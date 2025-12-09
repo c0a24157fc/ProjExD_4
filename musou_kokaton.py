@@ -264,6 +264,24 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
+class Gravity(pg.sprite.Sprite):
+    """
+    重力場に関するクラス
+    """
+    def __init__(self, life: int =400):
+        self.life = life
+        super().__init__()
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        pg.draw.rect(self.image, (0, 0, 0), (0, 0, WIDTH, HEIGHT))
+        self.image.set_alpha(150)
+        self.rect = self.image.get_rect()
+
+    def update(self):
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -275,6 +293,8 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    gravity = pg.sprite.Group()
+
 
     tmr = 0
     clock = pg.time.Clock()
@@ -290,7 +310,10 @@ def main():
                         beams.add(beam)
                 else:
                     beams.add(Beam(bird))
-            
+            if event.type == pg.KEYDOWN and event.key == pg.K_g:
+                if score.value >= 200:
+                    gravity.add(Gravity())
+                    score.value -= 200
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -310,6 +333,18 @@ def main():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
 
+        # 重力場 × 爆弾
+        for g in gravity:
+            for bomb in pg.sprite.spritecollide(g, bombs, True):
+                exps.add(Explosion(bomb, 50))
+                score.value += 1
+
+        # 重力場 × 敵機
+        for g in gravity:
+            for emy in pg.sprite.spritecollide(g, emys, True):
+                exps.add(Explosion(emy, 100))
+                score.value += 10
+
         for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
             bird.change_img(8, screen)  # こうかとん悲しみエフェクト
             score.update(screen)
@@ -327,6 +362,8 @@ def main():
         exps.update()
         exps.draw(screen)
         score.update(screen)
+        gravity.update()
+        gravity.draw(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
