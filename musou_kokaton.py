@@ -254,7 +254,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 0
+        self.value = 200
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -280,6 +280,47 @@ class Gravity(pg.sprite.Sprite):
         self.life -= 1
         if self.life < 0:
             self.kill()
+class EMP:
+    """
+    電磁パルス：敵機と爆弾を無効化する
+    """
+    def __init__(self, emys: pg.sprite.Group, bombs: pg.sprite.Group, screen: pg.Surface):
+        self.emys = emys
+        self.bombs = bombs
+        self.screen = screen
+        self.active = False
+        self.start_time = 0
+
+    def activate(self):
+        """EMP発動"""
+        self.active = True
+        self.start_time = time.time()
+
+        # 敵機を無効化
+        for emy in self.emys:
+            emy.interval = float("inf")  # 爆弾投下不能
+            # ラプラシアンフィルタ
+            emy.image = pg.transform.laplacian(emy.image)
+
+        # 爆弾を無効化
+        for bomb in self.bombs:
+            bomb.speed *= 0.5
+            bomb.state = "inactive"
+
+    def update(self):
+        """EMP発動中の効果反映（0.05秒だけ黄色い画面）"""
+        if not self.active:
+            return
+
+        elapsed = time.time() - self.start_time
+        if elapsed < 0.05:
+            # 画面全体に黄色半透明矩形
+            surface = pg.Surface((WIDTH, HEIGHT))
+            surface.set_alpha(120)
+            surface.fill((255, 255, 0))
+            self.screen.blit(surface, (0, 0))
+        else:
+            self.active = False  # 終了
 
 
 def main():
@@ -295,6 +336,7 @@ def main():
     emys = pg.sprite.Group()
     gravity = pg.sprite.Group()
 
+    emp = EMP(emys, bombs, screen)
 
     tmr = 0
     clock = pg.time.Clock()
@@ -314,6 +356,10 @@ def main():
                 if score.value >= 200:
                     gravity.add(Gravity())
                     score.value -= 200
+                
+            if event.type == pg.KEYDOWN and event.key == pg.K_e and score.value >= 20:
+                    emp.activate()
+                    score.value -= 20    
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -361,12 +407,13 @@ def main():
         bombs.draw(screen)
         exps.update()
         exps.draw(screen)
+        emp.update()
         score.update(screen)
         gravity.update()
         gravity.draw(screen)
         pg.display.update()
         tmr += 1
-        clock.tick(50)
+        clock.tick(50)        
 
 
 if __name__ == "__main__":
